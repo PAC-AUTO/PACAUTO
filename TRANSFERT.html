@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Realtime Database Example</title>
+</head>
+<body>
+    <h1>Tableau des Produits</h1>
+    <table id="productsTable">
+        <tr>
+            <th>Nom</th>
+            <th>Quantité</th>
+            <th>Prix</th>
+        </tr>
+    </table>
+
+    <button onclick="addNewProduct()">Ajouter un produit</button>
+
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
+
+    <script>
+        // Configurer Firebase
+        const firebaseConfig = {
+            apiKey: "VOTRE_API_KEY",
+            authDomain: "VOTRE_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://VOTRE_PROJECT_ID.firebaseio.com",
+            projectId: "VOTRE_PROJECT_ID",
+            storageBucket: "VOTRE_PROJECT_ID.appspot.com",
+            messagingSenderId: "VOTRE_SENDER_ID",
+            appId: "VOTRE_APP_ID"
+        };
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const ref = database.ref('tableData');
+
+        // Lire et afficher les données en temps réel
+        ref.on('value', (snapshot) => {
+            const data = snapshot.val();
+            updateTable(data);
+        });
+
+        // Fonction pour mettre à jour le tableau avec les nouvelles données
+        function updateTable(data) {
+            const table = document.getElementById('productsTable');
+            table.innerHTML = '<tr><th>Nom</th><th>Quantité</th><th>Prix</th></tr>'; // Réinitialiser le tableau
+            for (let key in data) {
+                const row = table.insertRow();
+                row.insertCell(0).innerText = data[key].name;
+                row.insertCell(1).innerText = data[key].quantity;
+                row.insertCell(2).innerText = data[key].price;
+            }
+        }
+
+        // Ajouter un nouveau produit
+        function addNewProduct() {
+            const newProduct = {
+                name: "Nouveau Produit",
+                quantity: 50,
+                price: 5
+            };
+            ref.push(newProduct); // Utiliser push pour ajouter un nouveau produit
+        }
+    </script>
+</body>
+</html>
