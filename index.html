@@ -6,7 +6,7 @@
     <title>Plan Hiérarchique avec Export HTML (FancyTree)</title>
     <style>
         .fancytree-title {
-            font-size: 1.4em; /* Par exemple, pour définir une taille de police de 18 pixels */
+            font-size: 1.4em;
         }
         body {
             font-family: Arial, sans-serif;
@@ -127,107 +127,439 @@
     <div id="tree" class="fancytree-container"></div>
 </div>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-database.js"></script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.1/jquery.fancytree-all-deps.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js"></script>
 
 <script>
-// Configuration Firebase
-const firebaseConfig = {
-    apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
-    authDomain: "pacautov2.firebaseapp.com",
-    databaseURL: "https://pacautov2-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "pacautov2",
-    storageBucket: "pacautov2.appspot.com",
-    messagingSenderId: "307082937084",
-    appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
+    // Firebase configuration (replace with your own Firebase project details)
+    const firebaseConfig = {
+
+  apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
+
+  authDomain: "pacautov2.firebaseapp.com",
+
+  databaseURL: "https://pacautov2-default-rtdb.europe-west1.firebasedatabase.app",
+
+  projectId: "pacautov2",
+
+  storageBucket: "pacautov2.appspot.com",
+
+  messagingSenderId: "307082937084",
+
+  appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
+
 };
 
-// Initialisation Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-// Sauvegarde automatique des données du tableau dans Firebase
-function saveTableDataToFirebase() {
-    const rows = document.querySelectorAll("#tableData tbody tr");
-    const tableData = [];
-    rows.forEach(row => {
-        const rowData = Array.from(row.cells).map(cell => cell.textContent);
-        tableData.push(rowData);
-    });
-
-    firebase.database().ref('tableData').set(tableData);
-}
-
-// Sauvegarde automatique des données de FancyTree dans Firebase
-function saveTreeDataToFirebase() {
-    const tree = $("#tree").fancytree("getTree").toDict(true);
-    firebase.database().ref('treeData').set(tree);
-}
-
-// Charger les données du tableau à partir de Firebase
-function loadTableDataFromFirebase() {
-    firebase.database().ref('tableData').once('value', snapshot => {
-        const data = snapshot.val();
-        if (data) {
-            const tableBody = document.querySelector("#tableData tbody");
-            tableBody.innerHTML = '';  // Vider l'ancien contenu
-            data.forEach(rowData => {
-                const row = document.createElement('tr');
-                row.innerHTML = rowData.map(cell => `<td>${cell}</td>`).join('');
-                tableBody.appendChild(row);
-            });
-        }
-    });
-}
-
-// Charger les données de FancyTree à partir de Firebase
-function loadTreeDataFromFirebase() {
-    firebase.database().ref('treeData').once('value', snapshot => {
-        const data = snapshot.val();
-        if (data) {
-            $("#tree").fancytree("getTree").reload(data);
-        }
-    });
-}
-
-// Sauvegarde en temps réel lorsque des données sont modifiées
-document.getElementById('tableData').addEventListener('input', saveTableDataToFirebase);
-document.getElementById('tree').addEventListener('change', saveTreeDataToFirebase);
-
-// Initialisation de FancyTree
-$(function() {
-    $("#tree").fancytree({
-        extensions: ["dnd5"],
-        source: [], // La source sera chargée à partir de Firebase
-        dnd5: {
-            preventRecursion: true,
-            preventVoidMoves: true,
-            dragStart: function(node, data) { return true; },
-            dragEnter: function(node, data) { return ["before", "after", "over"]; },
-            dragDrop: function(node, data) {
-                data.otherNode.moveTo(node, data.hitMode);
-                saveTreeDataToFirebase(); // Sauvegarder après un glisser-déposer
+    // Function to ensure all required properties are added to a node
+    function ensureNodeProperties(node) {
+        node.tooltip = node.tooltip || '';
+        node.title = node.title || '';
+        for (let i = 1; i <= 10; i++) {
+            const contentProp = `content${i}`;
+            if (!node.hasOwnProperty(contentProp)) {
+                node[contentProp] = '';
             }
         }
+    }
+
+    // Function to toggle tooltip display with HTML formatting
+    function toggleTooltipDisplay(node) {
+        const tooltipElement = node.span.querySelector('.tooltip-content');
+        const toggleBtn = node.span.querySelector('.toggle-btn');
+
+        if (tooltipElement.classList.contains('show-tooltip')) {
+            tooltipElement.classList.remove('show-tooltip');
+            toggleBtn.textContent = "+";
+        } else {
+            tooltipElement.classList.add('show-tooltip');
+            toggleBtn.textContent = "-";
+        }
+    }
+
+    // Function to update the counter display
+    function updateCounterDisplay(rowElement, counter) {
+        const counterCell = rowElement.querySelector('td:last-child');
+        counterCell.textContent = counter;
+        const col3 = rowElement.querySelector('td:nth-child(3)');
+        if (counter > 0) {
+            counterCell.classList.add('green-counter');
+            col3.classList.add('green-column');
+        } else {
+            counterCell.classList.remove('green-counter');
+            col3.classList.remove('green-column');
+        }
+    }
+
+    // Firebase: Save table data to Firebase
+    function saveTableDataToFirebase() {
+        const tableData = [];
+        document.querySelectorAll("#tableData tbody tr").forEach(row => {
+            const rowData = [];
+            row.querySelectorAll("td").forEach(cell => rowData.push(cell.textContent));
+            tableData.push(rowData);
+        });
+        db.ref("tableData").set(tableData);
+    }
+
+    // Firebase: Load table data from Firebase
+    function loadTableDataFromFirebase() {
+        db.ref("tableData").once("value", snapshot => {
+            const tableData = snapshot.val();
+            if (tableData) {
+                populateTable(tableData);
+            }
+        });
+    }
+
+    // Firebase: Save tree data to Firebase
+    function saveTreeDataToFirebase() {
+        const treeData = $("#tree").fancytree("getTree").toDict(true);
+        db.ref("treeData").set(treeData);
+    }
+
+    // Firebase: Load tree data from Firebase
+    function loadTreeDataFromFirebase() {
+        db.ref("treeData").once("value", snapshot => {
+            const treeData = snapshot.val();
+            if (treeData) {
+                $("#tree").fancytree("getTree").reload(treeData);
+            }
+        });
+    }
+
+    // Initialize FancyTree with drag-and-drop configuration
+    $(function() {
+        $("#tree").fancytree({
+            extensions: ["dnd5"],
+            source: [], // Your tree source
+            dnd5: {
+                preventRecursion: true,
+                preventVoidMoves: true,
+                dragStart: function(node, data) {
+                    return true;
+                },
+                dragEnter: function(node, data) {
+                    if (!data.otherNode) {
+                        return node.folder ? ["over"] : false;
+                    }
+                    if (data.otherNode.folder) {
+                        return node.folder ? ["before", "after", "over"] : false;
+                    } else {
+                        return node.folder ? ["over"] : ["before", "after"];
+                    }
+                },
+                dragDrop: function(node, data) {
+                    if (data.otherNode) {
+                        if (!data.otherNode.folder && node.folder) {
+                            var children = node.getChildren();
+                            if (children && children.length > 0) {
+                                var insertPosition = children.find(child => child.folder);
+                                if (insertPosition) {
+                                    data.otherNode.moveTo(insertPosition, "before");
+                                } else {
+                                    data.otherNode.moveTo(node, "child");
+                                }
+                            } else {
+                                data.otherNode.moveTo(node, "child");
+                            }
+                        } else {
+                            data.otherNode.moveTo(node, data.hitMode);
+                        }
+                    } else {
+                        var title = data.dataTransfer.getData("text/plain");
+                        var tooltip = data.dataTransfer.getData("text/tooltip");
+
+                        var newNode = {
+                            title: title,
+                            tooltip: tooltip,
+                            folder: false,
+                            allowChildren: false
+                        };
+
+                        if (node.folder) {
+                            var children = node.getChildren();
+                            if (children && children.length > 0) {
+                                var insertPosition = children.find(child => child.folder);
+                                if (insertPosition) {
+                                    node.addChildren(newNode, insertPosition);
+                                } else {
+                                    node.addChildren(newNode);
+                                }
+                            } else {
+                                node.addChildren(newNode);
+                            }
+                        } else {
+                            node.addChildren(newNode, data.hitMode);
+                        }
+                        node.setExpanded(true);
+
+                        updateCounterForTitle(title);
+                    }
+                }
+            },
+            renderNode: function(event, data) {
+                var node = data.node;
+                var $span = $(node.span);
+
+                if (!node.folder) {
+                    if ($span.find(".toggle-tooltip").length === 0) {
+                        $span.find(".fancytree-title").after("<span class='toggle-tooltip' style='cursor:pointer;'> [+]</span>");
+                        $span.append("<div class='tooltip-content' style='display:none; margin-left:20px;'>" + node.tooltip + "</div>");
+
+                        $span.find(".toggle-tooltip").on("click", function() {
+                            var $tooltipContent = $span.find(".tooltip-content");
+                            if ($tooltipContent.is(":visible")) {
+                                $tooltipContent.hide();
+                                $(this).text(" [+]");
+                            } else {
+                                $tooltipContent.show();
+                                $(this).text(" [-]");
+                            }
+                        });
+                    }
+
+                    $span.find(".fancytree-title").tooltip({
+                        content: function() {
+                            return node.tooltip;
+                        },
+                        tooltipClass: "custom-tooltip",
+                        show: { effect: "fadeIn", delay: 300 },
+                        hide: { effect: "fadeOut", delay: 0 },
+                        track: true
+                    });
+                } else {
+                    $span.find(".fancytree-title").tooltip({
+                        content: function() {
+                            return $("<div style='background-color: #ffffe0;'>" + node.tooltip + "</div>");
+                        },
+                        tooltipClass: "custom-tooltip-folder",
+                        show: { effect: "fadeIn", delay: 300 },
+                        hide: { effect: "fadeOut", delay: 0 },
+                        track: true
+                    });
+                }
+
+                $span.find(".fancytree-title").on("mousedown", function() {
+                    $(this).tooltip("close");
+                });
+            }
+        });
+
+        loadTableDataFromFirebase();  // Load table data from Firebase
+        loadTreeDataFromFirebase();   // Load tree data from Firebase
     });
 
-    // Charger les données lors du démarrage
-    loadTableDataFromFirebase();
-    loadTreeDataFromFirebase();
-});
+    // Function to increment the counter for the corresponding row in the left window
+    function updateCounterForTitle(title) {
+        var rows = document.querySelectorAll("#tableData tbody tr");
+        rows.forEach(function(row) {
+            var rowTitle = row.querySelector('td:nth-child(3)').textContent;
+            if (rowTitle === title) {
+                var counterCell = row.querySelector('td:last-child');
+                var counter = parseInt(counterCell.textContent) || 0;
+                counter++;
+                updateCounterDisplay(row, counter);
+            }
+        });
+    }
+
+    // Button to add a new child node
+    document.getElementById('addNodeBtn').addEventListener('click', function() {
+        const tree = $("#tree").fancytree("getTree");
+        const activeNode = tree.getActiveNode();
+
+        if (activeNode) {
+            const nodeName = prompt("Entrez le nom du nouveau sous-répertoire:");
+            const conditionAppliquee = prompt("Entrez la condition appliquée :");
+            if (nodeName) {
+                const newNode = activeNode.addChildren({
+                    title: nodeName,
+                    folder: true,
+                    extraClasses: "orange-node",
+                    tooltip: `<div class="tooltip-blue">${conditionAppliquee}</div>`
+                });
+                ensureNodeProperties(newNode);
+                activeNode.setExpanded(true);
+                newNode.span.querySelector('.fancytree-title').style.color = "orange";
+                saveTreeDataToFirebase();  // Save tree to Firebase
+            }
+        } else {
+            alert("Veuillez sélectionner un répertoire pour ajouter un sous-répertoire.");
+        }
+    });
+
+    // Button to delete the selected node
+    document.getElementById('deleteNodeBtn').addEventListener('click', function() {
+        const tree = $("#tree").fancytree("getTree");
+        const activeNode = tree.getActiveNode();
+
+        if (activeNode) {
+            if (confirm("Êtes-vous sûr de vouloir supprimer ce répertoire et tous ses sous-répertoires?")) {
+                activeNode.remove();
+                saveTreeDataToFirebase();  // Save tree to Firebase
+            }
+        } else {
+            alert("Veuillez sélectionner un répertoire à supprimer.");
+        }
+    });
+
+    // Import Excel file and populate the table
+    document.getElementById('importExcel').addEventListener('change', function(event) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+            populateTable(sheet);
+            saveTableDataToFirebase();  // Save table to Firebase
+        };
+        reader.readAsArrayBuffer(event.target.files[0]);
+    });
+
+    function populateTable(data) {
+        const tableBody = document.querySelector("#tableData tbody");
+        tableBody.innerHTML = '';
+        data.forEach((row, index) => {
+            if (index === 0) return;
+            const rowElement = document.createElement('tr');
+            rowElement.classList.add('draggable');
+            rowElement.setAttribute('draggable', true);
+
+            if (row[0] == 1) {
+                rowElement.classList.add('blue-line');
+            }
+
+            rowElement.innerHTML = 
+                `<td>${row[0] || ''}</td>
+                <td title="${data[0][1] || ''}">
+                    <a href="${row[1] || '#'}" target="_blank">${row[1] || ''}</a>
+                </td>
+                <td title="${row[6] || ''}">${row[2] || ''}</td>
+                <td title="${data[0][5] || ''}">${row[5] || ''}</td>
+                <td title="${data[0][7] || ''}">${row[7] || ''}</td>
+                <td title="${data[0][8] || ''}">${row[8] || ''}</td>
+                <td title="${data[0][10] || ''}">${row[10] || ''}</td>
+                <td title="${data[0][11] || ''}">${row[11] || ''}</td>
+                <td title="${data[0][12] || ''}">${row[12] || ''}</td>
+                <td title="${data[0][13] || ''}">${row[13] || ''}</td>
+                <td title="${data[0][14] || ''}">${row[14] || ''}</td>
+                <td title="${data[0][15] || ''}">${row[15] || ''}</td>
+                <td title="${data[0][16] || ''}">${row[16] || ''}</td>
+                <td title="${data[0][17] || ''}">${row[17] || ''}</td>
+                <td>0</td>`;
+
+            rowElement.addEventListener('dragstart', handleDragStart);
+            tableBody.appendChild(rowElement);
+        });
+    }
+
+    function handleDragStart(event) {
+        event.dataTransfer.setData('text/plain', event.target.querySelector('td:nth-child(3)').textContent);
+        event.dataTransfer.setData('text/tooltip', event.target.querySelector('td:nth-child(3)').getAttribute('title'));
+    }
+
+    // Import Word file and convert to FancyTree
+    document.getElementById('importWord').addEventListener('change', function(event) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            mammoth.convertToHtml({ arrayBuffer: e.target.result })
+                .then(result => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(result.value, 'text/html');
+                    buildFancyTreeFromDocx(doc.body);
+                    saveTreeDataToFirebase();  // Save tree to Firebase
+                });
+        };
+        reader.readAsArrayBuffer(event.target.files[0]);
+    });
+
+    function buildFancyTreeFromDocx(content) {
+        const treeData = [];
+        const stack = [treeData];
+        content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+            const level = parseInt(heading.tagName[1]); 
+            const node = { title: heading.textContent, folder: true, children: [] };
+            ensureNodeProperties(node);
+            while (stack.length > level) stack.pop();
+            stack[stack.length - 1].push(node);
+            stack.push(node.children);
+        });
+        $("#tree").fancytree("getTree").reload(treeData);
+        saveTreeDataToFirebase();  // Save tree to Firebase
+    }
+
+    // Export and Import JSON functionalities (already present)
+    document.getElementById('exportBtn').addEventListener('click', function() {
+        const tree = $("#tree").fancytree("getTree").toDict(true);
+        const json = JSON.stringify(tree, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        saveAs(blob, "plan.json");
+        saveTreeDataToFirebase();  // Save tree to Firebase
+    });
+
+    document.getElementById('importJsonBtn').addEventListener('click', function() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'application/json';
+        fileInput.addEventListener('change', function(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const json = JSON.parse(e.target.result);
+                $("#tree").fancytree("getTree").reload(json);
+                saveTreeDataToFirebase();  // Save tree to Firebase
+            };
+            reader.readAsText(event.target.files[0]);
+        });
+        fileInput.click();
+    });
+
+    // Function to export the table of the left window as HTML
+    document.getElementById('exportHtmlTableBtn').addEventListener('click', function() {
+        const tableHtml = document.getElementById('tableData').outerHTML;
+        const blob = new Blob([tableHtml], { type: "text/html" });
+        saveAs(blob, "tableau.html");
+        saveTableDataToFirebase();  // Save table to Firebase
+    });
+
+    // Function to import an HTML table into the left window
+    document.getElementById('importHtmlTableBtn').addEventListener('click', function() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'text/html';
+        fileInput.addEventListener('change', function(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(e.target.result, 'text/html');
+                const importedTable = doc.querySelector('table');
+                if (importedTable) {
+                    document.getElementById('tableData').innerHTML = importedTable.innerHTML;
+
+                    const rows = document.querySelectorAll("#tableData tbody tr");
+                    rows.forEach(row => {
+                        row.addEventListener('dragstart', handleDragStart);
+                    });
+                    saveTableDataToFirebase();  // Save table to Firebase
+                }
+            };
+            reader.readAsText(event.target.files[0]);
+        });
+        fileInput.click();
+    });
 </script>
 </body>
 </html>
-
-
 
 
 
