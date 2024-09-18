@@ -6,9 +6,9 @@
     <title>Plan Hiérarchique avec Export HTML (FancyTree)</title>
     <style>
         .fancytree-title {
-    font-size: 1.4em; /* Par exemple, pour définir une taille de police de 18 pixels */
-}
-            body {
+            font-size: 1.4em; /* Par exemple, pour définir une taille de police de 18 pixels */
+        }
+        body {
             font-family: Arial, sans-serif;
             display: flex;
             height: 100vh;
@@ -27,7 +27,7 @@
             border: 1px solid #ddd;
             padding: 8px;
             width: 5%;
-            font-size: 1em; /* Taille de police augmentée */
+            font-size: 1em;
         }
         .draggable {
             cursor: move;
@@ -127,6 +127,10 @@
     <div id="tree" class="fancytree-container"></div>
 </div>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-database.js"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
@@ -135,532 +139,94 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.1/jquery.fancytree-all-deps.min.js"></script>
 
 <script>
-// Function to ensure all required properties are added to a node
-function ensureNodeProperties(node) {
-    node.tooltip = node.tooltip || '';
-    node.title = node.title || '';
-    for (let i = 1; i <= 10; i++) {
-        const contentProp = `content${i}`;
-        if (!node.hasOwnProperty(contentProp)) {
-            node[contentProp] = '';
+// Configuration Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
+    authDomain: "pacautov2.firebaseapp.com",
+    databaseURL: "https://pacautov2-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "pacautov2",
+    storageBucket: "pacautov2.appspot.com",
+    messagingSenderId: "307082937084",
+    appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
+};
+
+// Initialisation Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// Sauvegarde automatique des données du tableau dans Firebase
+function saveTableDataToFirebase() {
+    const rows = document.querySelectorAll("#tableData tbody tr");
+    const tableData = [];
+    rows.forEach(row => {
+        const rowData = Array.from(row.cells).map(cell => cell.textContent);
+        tableData.push(rowData);
+    });
+
+    firebase.database().ref('tableData').set(tableData);
+}
+
+// Sauvegarde automatique des données de FancyTree dans Firebase
+function saveTreeDataToFirebase() {
+    const tree = $("#tree").fancytree("getTree").toDict(true);
+    firebase.database().ref('treeData').set(tree);
+}
+
+// Charger les données du tableau à partir de Firebase
+function loadTableDataFromFirebase() {
+    firebase.database().ref('tableData').once('value', snapshot => {
+        const data = snapshot.val();
+        if (data) {
+            const tableBody = document.querySelector("#tableData tbody");
+            tableBody.innerHTML = '';  // Vider l'ancien contenu
+            data.forEach(rowData => {
+                const row = document.createElement('tr');
+                row.innerHTML = rowData.map(cell => `<td>${cell}</td>`).join('');
+                tableBody.appendChild(row);
+            });
         }
-    }
+    });
 }
 
-// Function to toggle tooltip display with HTML formatting
-function toggleTooltipDisplay(node) {
-    const tooltipElement = node.span.querySelector('.tooltip-content');
-    const toggleBtn = node.span.querySelector('.toggle-btn');
-
-    if (tooltipElement.classList.contains('show-tooltip')) {
-        tooltipElement.classList.remove('show-tooltip');
-        toggleBtn.textContent = "+";
-    } else {
-        tooltipElement.classList.add('show-tooltip');
-        toggleBtn.textContent = "-";
-    }
-}
-
-// Function to update the counter display
-function updateCounterDisplay(rowElement, counter) {
-    const counterCell = rowElement.querySelector('td:last-child');
-    counterCell.textContent = counter;
-    const col3 = rowElement.querySelector('td:nth-child(3)');
-    if (counter > 0) {
-        counterCell.classList.add('green-counter');
-        col3.classList.add('green-column');
-    } else {
-        counterCell.classList.remove('green-counter');
-        col3.classList.remove('green-column');
-    }
-}
-
-
-
-
-// Recursive function to update counters for all simple elements (folder: false) in a deleted node and its children
-function updateCountersForDeletedNode(node) {
-    if (!node.folder) {
-        const row = Array.from(document.querySelectorAll("#tableData tbody tr")).find(row =>
-            row.querySelector('td:nth-child(3)').textContent === node.title);
-        if (row) {
-            let counter = parseInt(row.querySelector('td:last-child').textContent) || 0;
-            counter--;
-            updateCounterDisplay(row, counter); // Update the display of the counter
+// Charger les données de FancyTree à partir de Firebase
+function loadTreeDataFromFirebase() {
+    firebase.database().ref('treeData').once('value', snapshot => {
+        const data = snapshot.val();
+        if (data) {
+            $("#tree").fancytree("getTree").reload(data);
         }
-    }
-    const children = node.getChildren();
-    if (children) {
-        children.forEach(child => updateCountersForDeletedNode(child));
-    }
+    });
 }
 
-// Function to update the counter display in the left window
-function updateCounterDisplay(row, counter) {
-    const counterCell = row.querySelector('td:last-child');
-    counterCell.textContent = counter;
-    if (counter > 0) {
-        counterCell.classList.add('green-counter'); // Optionally add a style to indicate the counter is greater than zero
-    } else {
-        counterCell.classList.remove('green-counter');
-    }
-}
+// Sauvegarde en temps réel lorsque des données sont modifiées
+document.getElementById('tableData').addEventListener('input', saveTableDataToFirebase);
+document.getElementById('tree').addEventListener('change', saveTreeDataToFirebase);
 
-// Initialize FancyTree with drag-and-drop configuration
+// Initialisation de FancyTree
 $(function() {
     $("#tree").fancytree({
         extensions: ["dnd5"],
-        source: [], // Your tree source
+        source: [], // La source sera chargée à partir de Firebase
         dnd5: {
             preventRecursion: true,
-            preventVoidMoves: true, // Avoids dropping in invalid spots
-            dragStart: function(node, data) {
-                return true; // Allow dragging of all nodes within the tree
-            },
-            dragEnter: function(node, data) {
-                if (!data.otherNode) {
-                    return node.folder ? ["over"] : false;
-                }
-                if (data.otherNode.folder) {
-                    return node.folder ? ["before", "after", "over"] : false;
-                } else {
-                    return node.folder ? ["over"] : ["before", "after"];
-                }
-            },
+            preventVoidMoves: true,
+            dragStart: function(node, data) { return true; },
+            dragEnter: function(node, data) { return ["before", "after", "over"]; },
             dragDrop: function(node, data) {
-                if (data.otherNode) {
-                    // Tree-to-tree drop: move node within the tree
-                    if (!data.otherNode.folder && node.folder) {
-                        var children = node.getChildren();
-                        if (children && children.length > 0) {
-                            var insertPosition = children.find(child => child.folder);
-                            if (insertPosition) {
-                                data.otherNode.moveTo(insertPosition, "before");
-                            } else {
-                                data.otherNode.moveTo(node, "child");
-                            }
-                        } else {
-                            data.otherNode.moveTo(node, "child");
-                        }
-                    } else {
-                        data.otherNode.moveTo(node, data.hitMode);
-                    }
-                } else {
-                    // Handle external drops (from the left window)
-                    var title = data.dataTransfer.getData("text/plain");
-                    var tooltip = data.dataTransfer.getData("text/tooltip");
-
-                    var newNode = {
-                        title: title,
-                        tooltip: tooltip, // Store the tooltip as HTML
-                        folder: false,
-                        allowChildren: false
-                    };
-
-                    if (node.folder) {
-                        var children = node.getChildren();
-                        if (children && children.length > 0) {
-                            var insertPosition = children.find(child => child.folder);
-                            if (insertPosition) {
-                                node.addChildren(newNode, insertPosition);
-                            } else {
-                                node.addChildren(newNode);
-                            }
-                        } else {
-                            node.addChildren(newNode);
-                        }
-                    } else {
-                        node.addChildren(newNode, data.hitMode);
-                    }
-                    node.setExpanded(true);
-
-                    updateCounterForTitle(title);
-                }
+                data.otherNode.moveTo(node, data.hitMode);
+                saveTreeDataToFirebase(); // Sauvegarder après un glisser-déposer
             }
-        },
-        renderNode: function(event, data) {
-            var node = data.node;
-            var $span = $(node.span);
-
-            // For simple nodes (folder: false), apply HTML tooltips and increase width to 800px
-            if (!node.folder) {
-                // Ensure HTML tooltip content is used in the hover and on toggle
-                if ($span.find(".toggle-tooltip").length === 0) {
-                    $span.find(".fancytree-title").after("<span class='toggle-tooltip' style='cursor:pointer;'> [+]</span>");
-                    $span.append("<div class='tooltip-content' style='display:none; margin-left:20px;'>" + node.tooltip + "</div>");
-
-                    $span.find(".toggle-tooltip").on("click", function() {
-                        var $tooltipContent = $span.find(".tooltip-content");
-                        if ($tooltipContent.is(":visible")) {
-                            $tooltipContent.hide();
-                            $(this).text(" [+]");
-                        } else {
-                            $tooltipContent.show();
-                            $(this).text(" [-]");
-                        }
-                    });
-                }
-
-                $span.find(".fancytree-title").tooltip({
-                    content: function() {
-                        return node.tooltip; // Render the HTML content in the tooltip
-                    },
-                    tooltipClass: "custom-tooltip", // Custom class for styling
-                    show: { effect: "fadeIn", delay: 300 }, // Half-second delay before showing the tooltip
-                    hide: { effect: "fadeOut", delay: 0 }, // Tooltip fades out instantly when hidden
-                    track: true // Tooltip follows the mouse
-                });
-            } else {
-                // For folder nodes (folder: true), apply plain text with yellow background
-                $span.find(".fancytree-title").tooltip({
-                    content: function() {
-                        return $("<div style='background-color: #ffffe0;'>" + node.tooltip + "</div>"); // Tooltip with light yellow background
-                    },
-                    tooltipClass: "custom-tooltip-folder", // Custom class for folder tooltips
-                    show: { effect: "fadeIn", delay: 300 }, // Half-second delay before showing the tooltip
-                    hide: { effect: "fadeOut", delay: 0 }, // Tooltip fades out instantly when hidden
-                    track: true // Tooltip follows the mouse
-                });
-            }
-
-            // Hide the tooltip when the element is clicked or dragged
-            $span.find(".fancytree-title").on("mousedown", function() {
-                $(this).tooltip("close"); // Close the tooltip on mousedown
-            });
         }
     });
 
-    // Add custom styling for the tooltips
-    $("head").append(`
-        <style>
-            .custom-tooltip {
-                font-size: 1.4em; /* Set font size to 8pt */
-                max-width: 800px; /* Increase tooltip width to 800px */
-                word-wrap: break-word; /* Ensure long text wraps */
-            }
-            .custom-tooltip-folder {
-                font-size: 12pt; /* Set font size to 8pt */
-                background-color: #ffffe0; /* Light yellow background for folder tooltips */
-                word-wrap: break-word; /* Ensure long text wraps */
-            }
-        </style>
-    `);
-});
-
-
-
-
-
-
-
-
-
-
-
-// Function to increment the counter for the corresponding row in the left window
-function updateCounterForTitle(title) {
-    var rows = document.querySelectorAll("#tableData tbody tr");
-    rows.forEach(function(row) {
-        var rowTitle = row.querySelector('td:nth-child(3)').textContent;
-        if (rowTitle === title) {
-            var counterCell = row.querySelector('td:last-child');
-            var counter = parseInt(counterCell.textContent) || 0;
-            counter++;
-            updateCounterDisplay(row, counter);
-        }
-    });
-}
-
-
-
-
-
-// Function to increment the counter for the corresponding row in the left window
-function updateCounterForTitle(title) {
-    // Find the row in the table that corresponds to the dropped item's title
-    var rows = document.querySelectorAll("#tableData tbody tr");
-    rows.forEach(function(row) {
-        var rowTitle = row.querySelector('td:nth-child(3)').textContent;
-        if (rowTitle === title) {
-            var counterCell = row.querySelector('td:last-child');
-            var counter = parseInt(counterCell.textContent) || 0;
-            counter++;
-            updateCounterDisplay(row, counter);
-        }
-    });
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Button to add a new child node
-document.getElementById('addNodeBtn').addEventListener('click', function() {
-    const tree = $("#tree").fancytree("getTree");
-    const activeNode = tree.getActiveNode();
-
-    if (activeNode) {
-        const nodeName = prompt("Entrez le nom du nouveau sous-répertoire:");
-        const conditionAppliquee = prompt("Entrez la condition appliquée :");
-        if (nodeName) {
-            const newNode = activeNode.addChildren({
-                title: nodeName,
-                folder: true,
-                extraClasses: "orange-node",
-                tooltip: `<div class="tooltip-blue">${conditionAppliquee}</div>`
-            });
-            ensureNodeProperties(newNode);
-            activeNode.setExpanded(true);
-            newNode.span.querySelector('.fancytree-title').style.color = "orange";
-        }
-    } else {
-        alert("Veuillez sélectionner un répertoire pour ajouter un sous-répertoire.");
-    }
-});
-
-// Button to delete the selected node
-document.getElementById('deleteNodeBtn').addEventListener('click', function() {
-    const tree = $("#tree").fancytree("getTree");
-    const activeNode = tree.getActiveNode();
-
-    if (activeNode) {
-        if (confirm("Êtes-vous sûr de vouloir supprimer ce répertoire et tous ses sous-répertoires?")) {
-
-            updateCountersForDeletedNode(activeNode);
-
-            activeNode.remove();
-        }
-    } else {
-        alert("Veuillez sélectionner un répertoire à supprimer.");
-    }
-});
-
-// Function to expand all nodes containing a specific element
-function expandNodesContainingElement(elementName) {
-    const tree = $("#tree").fancytree("getTree");
-    tree.visit(function(node) {
-        if (node.title === elementName && !node.folder) {
-            node.makeVisible();
-            node.span.querySelector('.fancytree-title').classList.add('highlight-expanded');
-        }
-    });
-}
-
-// Event listener for clicking on the "Compteur" column
-document.getElementById('tableData').addEventListener('click', function(event) {
-    if (event.target.tagName === 'TD' && event.target.cellIndex === 14) {
-        const row = event.target.parentNode;
-        const elementName = row.querySelector('td:nth-child(3)').textContent;
-        expandNodesContainingElement(elementName);
-    }
-});
-
-// Function to export the tree to HTML
-document.getElementById('exportHtmlBtn').addEventListener('click', function() {
-    const tree = $("#tree").fancytree("getTree").toDict(true);
-
-    function traverseTree(node, depth = 1) {
-        let output = '';
-        const title = node.title || '';
-        const tooltip = node.tooltip || '';
-
-        if (node.folder) {
-            output += `<h${depth}>${title}</h${depth}>\n<p>${tooltip}</p>\n`;
-        } else {
-            output += `<p><strong style="color:blue;">${title}</strong><br>${tooltip}</p>\n`;
-        }
-        if (node.children) {
-            node.children.forEach(child => {
-                output += traverseTree(child, depth + 1);
-            });
-        }
-        return output;
-    }
-
-    const htmlContent = 
-    `<!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Plan Hiérarchique Exporté</title>
-    </head>
-    <body>
-        ${traverseTree(tree)}
-    </body>
-    </html>`;
-
-    const blob = new Blob([htmlContent], { type: "text/html" });
-    saveAs(blob, "plan_hierarchique.html");
-});
-
-// Import Excel file and populate the table
-document.getElementById('importExcel').addEventListener('change', function(event) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-        populateTable(sheet);
-    };
-    reader.readAsArrayBuffer(event.target.files[0]);
-});
-
-function populateTable(data) {
-    const tableBody = document.querySelector("#tableData tbody");
-    tableBody.innerHTML = '';
-    data.forEach((row, index) => {
-        if (index === 0) return;
-        const rowElement = document.createElement('tr');
-        rowElement.classList.add('draggable');
-        rowElement.setAttribute('draggable', true);
-
-        if (row[0] == 1) {
-            rowElement.classList.add('blue-line');
-        }
-
-        rowElement.innerHTML = 
-            `<td>${row[0] || ''}</td>
-            <td title="${data[0][1] || ''}">
-                <a href="${row[1] || '#'}" target="_blank">${row[1] || ''}</a>
-            </td>
-            <td title="${row[6] || ''}">${row[2] || ''}</td>
-            <td title="${data[0][5] || ''}">${row[5] || ''}</td>
-            <td title="${data[0][7] || ''}">${row[7] || ''}</td>
-            <td title="${data[0][8] || ''}">${row[8] || ''}</td>
-            <td title="${data[0][10] || ''}">${row[10] || ''}</td>
-            <td title="${data[0][11] || ''}">${row[11] || ''}</td>
-            <td title="${data[0][12] || ''}">${row[12] || ''}</td>
-            <td title="${data[0][13] || ''}">${row[13] || ''}</td>
-            <td title="${data[0][14] || ''}">${row[14] || ''}</td>
-            <td title="${data[0][15] || ''}">${row[15] || ''}</td>
-            <td title="${data[0][16] || ''}">${row[16] || ''}</td>
-            <td title="${data[0][17] || ''}">${row[17] || ''}</td>
-            <td>0</td>`;
-
-        rowElement.addEventListener('dragstart', handleDragStart);
-        tableBody.appendChild(rowElement);
-    });
-}
-
-function handleDragStart(event) {
-    event.dataTransfer.setData('text/plain', event.target.querySelector('td:nth-child(3)').textContent);
-    event.dataTransfer.setData('text/tooltip', event.target.querySelector('td:nth-child(3)').getAttribute('title'));
-}
-
-
-
-
-// Import Word file and convert to FancyTree
-document.getElementById('importWord').addEventListener('change', function(event) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        mammoth.convertToHtml({ arrayBuffer: e.target.result })
-            .then(result => {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(result.value, 'text/html');
-                buildFancyTreeFromDocx(doc.body);
-            });
-    };
-    reader.readAsArrayBuffer(event.target.files[0]);
-});
-
-function buildFancyTreeFromDocx(content) {
-    const treeData = [];
-    const stack = [treeData];
-    content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
-        const level = parseInt(heading.tagName[1]); 
-        const node = { title: heading.textContent, folder: true, children: [] };
-        ensureNodeProperties(node);
-        while (stack.length > level) stack.pop();
-        stack[stack.length - 1].push(node);
-        stack.push(node.children);
-    });
-    $("#tree").fancytree("getTree").reload(treeData);
-}
-
-// Export and Import JSON functionalities (already present)
-document.getElementById('exportBtn').addEventListener('click', function() {
-    const tree = $("#tree").fancytree("getTree").toDict(true);
-    const json = JSON.stringify(tree, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    saveAs(blob, "plan.json");
-});
-
-document.getElementById('importJsonBtn').addEventListener('click', function() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'application/json';
-    fileInput.addEventListener('change', function(event) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const json = JSON.parse(e.target.result);
-            $("#tree").fancytree("getTree").reload(json);
-        };
-        reader.readAsText(event.target.files[0]);
-    });
-    fileInput.click();
-});
-
-// Function to export the table of the left window as HTML
-document.getElementById('exportHtmlTableBtn').addEventListener('click', function() {
-    const tableHtml = document.getElementById('tableData').outerHTML;
-    const blob = new Blob([tableHtml], { type: "text/html" });
-    saveAs(blob, "tableau.html");
-});
-
-// Function to import an HTML table into the left window
-document.getElementById('importHtmlTableBtn').addEventListener('click', function() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'text/html';
-    fileInput.addEventListener('change', function(event) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(e.target.result, 'text/html');
-            const importedTable = doc.querySelector('table');
-            if (importedTable) {
-                document.getElementById('tableData').innerHTML = importedTable.innerHTML;
-
-                const rows = document.querySelectorAll("#tableData tbody tr");
-                rows.forEach(row => {
-                    row.addEventListener('dragstart', handleDragStart);
-                });
-            }
-        };
-        reader.readAsText(event.target.files[0]);
-    });
-    fileInput.click();
+    // Charger les données lors du démarrage
+    loadTableDataFromFirebase();
+    loadTreeDataFromFirebase();
 });
 </script>
 </body>
 </html>
+
 
 
 
