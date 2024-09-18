@@ -3,37 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fenêtres avec Importation XLS et Firebase</title>
+    <title>FancyTree avec Firebase et Importation XLS</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.firebase.com/js/client/2.4.2/firebase.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/skin-win7/ui.fancytree.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/skin-lion/ui.fancytree.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/jquery.fancytree-all-deps.min.js"></script>
     <style>
-        .split { display: flex; height: 100vh; }
-        .left, .right { padding: 10px; overflow-y: auto; }
-        .left { width: 50%; border-right: 1px solid #ddd; }
-        .right { width: 50%; }
         .table { width: 100%; border-collapse: collapse; }
         .table th, .table td { border: 1px solid #ddd; padding: 8px; }
         .draggable { cursor: move; }
     </style>
 </head>
 <body>
-    <div class="split">
-        <div class="left">
-            <h2>Importation XLS</h2>
-            <input type="file" id="importExcel" accept=".xlsx">
-            <table id="fancytreeTable" class="table"></table>
-        </div>
-        <div class="right">
-            <h2>Contenu de la Fenêtre de Droite</h2>
-            <!-- Fenêtre de droite pour des interactions supplémentaires -->
-        </div>
-    </div>
+    <h2>Importation XLS avec Firebase et FancyTree</h2>
+    <input type="file" id="importExcel" accept=".xlsx">
+    <table id="fancytreeTable" class="table">
+        <thead>
+            <tr>
+                <th>Key</th>
+                <th>Title</th>
+                <th>Colonne 1</th>
+                <th>Colonne 2</th>
+                <th>Compteur</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
 
     <script>
-        // Initialisation Firebase
+        // Initialisation de Firebase
         var firebaseConfig = {
               apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
 
@@ -53,6 +53,7 @@
         firebase.initializeApp(firebaseConfig);
         var database = firebase.database();
 
+        // Importation et gestion de l'Excel
         document.getElementById('importExcel').addEventListener('change', function(event) {
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -70,71 +71,54 @@
 
             data.forEach((row, index) => {
                 if (index === 0) return; // Skip header
-
                 let newNode = {
-                    title: row[1], // Colonne 2 (index 1)
-                    tooltip: row[6], // Colonne 7 pour le tooltip
+                    title: row[1] || "Titre manquant",  // Colonne 2 du fichier Excel
+                    tooltip: row[6] || "Pas de tooltip",  // Colonne 7 pour le tooltip
                     folder: false,
                     data: {
-                        column1: row[0],  // Colonne 1
-                        column3: row[2],  // Colonne 3
-                        column6: row[5],  // Colonne 6
-                        column8: row[7],  // Colonne 8
-                        column9: row[8],  // Colonne 9
-                        column11: row[10], // Colonne 11
-                        column12: row[11], // Colonne 12
-                        column13: row[12], // Colonne 13
-                        column14: row[13], // Colonne 14
-                        column15: row[14], // Colonne 15
-                        column16: row[15], // Colonne 16
-                        column17: row[16], // Colonne 17
-                        column18: row[17]  // Colonne 18
-                    },
-                    extraClasses: "draggable"
+                        column1: row[0] || "N/A",  // Colonne 1
+                        column2: row[2] || "N/A",  // Colonne 3
+                        column6: row[5] || "N/A",  // Colonne 6
+                        column8: row[7] || "N/A",  // Colonne 8
+                        column9: row[8] || "N/A",  // Colonne 9
+                        column11: row[10] || "N/A", // Colonne 11
+                        column12: row[11] || "N/A", // Colonne 12
+                        column13: row[12] || "N/A", // Colonne 13
+                        column14: row[13] || "N/A", // Colonne 14
+                        column15: row[14] || "N/A", // Colonne 15
+                        column16: row[15] || "N/A", // Colonne 16
+                        column17: row[16] || "N/A", // Colonne 17
+                        column18: row[17] || "N/A"  // Colonne 18
+                    }
                 };
                 treeData.push(newNode);
             });
 
+            // Sauvegarde dans Firebase et affichage dans FancyTree
             $("#fancytreeTable").fancytree({
-                extensions: ["table"],
+                extensions: ["table", "dnd5"],
                 table: {
-                    indentation: 20,
-                    nodeColumnIdx: 0,
                     checkboxColumnIdx: 0,
-                    titleColumnIdx: 1
+                    indentation: 20,
+                    nodeColumnIdx: 1
                 },
                 source: treeData,
                 renderColumns: function(event, data) {
                     var node = data.node,
                         $tdList = $(node.tr).find(">td");
 
-                    // Render title (column 3 with tooltip)
-                    $tdList.eq(0).text(node.title).attr("title", node.tooltip);
+                    $tdList.eq(0).text(node.key);  // Key
+                    $tdList.eq(1).text(node.title).attr("title", node.tooltip);  // Title avec tooltip
+                    $tdList.eq(2).text(node.data.column1);  // Données colonne 1
+                    $tdList.eq(3).text(node.data.column2);  // Données colonne 2
+                    $tdList.eq(4).html("<span class='compteur'>0</span>");  // Colonne compteur
 
-                    // Render other columns
-                    $tdList.eq(1).text(node.data.column1);
-                    $tdList.eq(2).text(node.data.column3);
-                    $tdList.eq(3).text(node.data.column6);
-                    // Add more columns as needed...
-
-                    // Add "Compteur" column
-                    $tdList.eq(-1).html("<span class='compteur'>0</span>");
+                    // Sauvegarde Firebase à chaque activation de nœud
+                    firebase.database().ref('fancytree/' + node.key).set(node.data);
                 },
-                activate: function(event, data) {
-                    // Sauvegarder dans Firebase quand un élément est activé
-                    var nodeData = data.node.data;
-                    database.ref('fancytree/' + data.node.key).set(nodeData);
-                },
-                draggable: {
-                    // FancyTree drag & drop configuration
-                    autoExpand: true,
-                    preventVoidMoves: true,
-                    dragStart: function(node, data) {
-                        return true;
-                    },
-                    dragEnter: function(node, data) {
-                        return true;
-                    },
+                dnd5: {
+                    dragStart: function(node, data) { return true; },
+                    dragEnter: function(node, data) { return true; },
                     dragDrop: function(node, data) {
                         data.otherNode.moveTo(node, data.hitMode);
                     }
