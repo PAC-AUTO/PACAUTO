@@ -4,23 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FancyTree avec Firebase et Importation XLS</title>
-    <!-- jQuery and FancyTree -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/skin-lion/ui.fancytree.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/jquery.fancytree-all-deps.min.js"></script>
-    
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js"></script>
-    
+
     <style>
         .table { width: 100%; border-collapse: collapse; }
         .table th, .table td { border: 1px solid #ddd; padding: 8px; }
     </style>
 </head>
 <body>
-    <h2>FancyTree avec Firebase et Importation XLS</h2>
+    <h2>FancyTree avec Importation XLS et Firebase</h2>
     <input type="file" id="importExcel" accept=".xlsx">
     <table id="fancytreeTable" class="table">
         <thead>
@@ -36,9 +35,9 @@
     </table>
 
     <script>
-        // Firebase configuration
+        // Configuration Firebase avec des valeurs correctes
         const firebaseConfig = {
-            apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
+             apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
 
   authDomain: "pacautov2.firebaseapp.com",
 
@@ -54,14 +53,18 @@
 
         };
 
-        // Initialize Firebase
+        // Initialisation de Firebase
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Fonction pour sauvegarder les données en temps réel dans Firebase
-        function saveToFirebase(nodeData) {
-            const nodeId = nodeData.key;
-            firebase.database().ref('tree/' + nodeId).set(nodeData);
+        // Fonction pour sauvegarder les données dans Firebase après l'importation FancyTree
+        function saveToFirebase(treeData) {
+            treeData.forEach(node => {
+                const nodeId = node.key;
+                firebase.database().ref('tree/' + nodeId).set(node)
+                    .then(() => console.log(`Données sauvegardées pour le nœud ${nodeId}`))
+                    .catch(err => console.error(`Erreur de sauvegarde : ${err}`));
+            });
         }
 
         // Gestion de l'importation du fichier Excel
@@ -72,60 +75,56 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-                generateFancyTreeFromExcel(sheet);
+                generateFancyTreeFromExcel(sheet); // Charger d'abord dans FancyTree
             };
             reader.readAsArrayBuffer(event.target.files[0]);
         });
 
-        // Génération du FancyTree à partir des données Excel
+        // Fonction pour générer FancyTree à partir des données Excel
         function generateFancyTreeFromExcel(data) {
             let treeData = [];
 
             data.forEach((row, index) => {
-                if (index === 0) return; // Skip header
+                if (index === 0) return; // Ignorer l'en-tête
 
                 let newNode = {
+                    key: index,  // Clé unique basée sur l'index
                     title: row[1] || "Titre manquant",  // Colonne 2 du fichier Excel
                     folder: false,
-                    key: index,  // Utilisation de l'index comme clé unique
                     data: {
                         column1: row[0] || "N/A",  // Colonne 1
                         column3: row[2] || "N/A"   // Colonne 3
                     }
                 };
                 treeData.push(newNode);
-                saveToFirebase(newNode);  // Sauvegarder chaque nœud dans Firebase
             });
 
-            // Création de l'arbre avec l'extension table activée
+            // Création de FancyTree avec les données importées
             $("#fancytreeTable").fancytree({
                 extensions: ["table"],
                 table: {
-                    checkboxColumnIdx: 0,  // Add checkboxes to this column index
-                    indentation: 20,       // Indentation for tree structure
-                    nodeColumnIdx: 1       // Place the expander and node title in this column
+                    checkboxColumnIdx: 0,  // Ajouter des cases à cocher dans cette colonne
+                    indentation: 20,       // Indentation pour la structure de l'arbre
+                    nodeColumnIdx: 1       // Placer l'expandeur et le titre du nœud dans cette colonne
                 },
                 source: treeData,
                 renderColumns: function(event, data) {
                     var node = data.node,
                         $tdList = $(node.tr).find(">td");
 
-                    $tdList.eq(0).text(node.key);  // Display node key
-                    $tdList.eq(1).text(node.title);  // Display node title
-                    $tdList.eq(2).text(node.data.column1);  // Custom data for column 1
-                    $tdList.eq(3).text(node.data.column3);  // Custom data for column 3
-                },
-                modifyChild: function(event, data) {
-                    saveToFirebase(data.node.toDict(true));  // Sauvegarder les modifications en temps réel
+                    $tdList.eq(0).text(node.key);  // Afficher la clé du nœud
+                    $tdList.eq(1).text(node.title);  // Afficher le titre du nœud
+                    $tdList.eq(2).text(node.data.column1);  // Afficher les données personnalisées pour la colonne 1
+                    $tdList.eq(3).text(node.data.column3);  // Afficher les données personnalisées pour la colonne 3
                 }
             });
+
+            // Sauvegarder les données dans Firebase après que FancyTree est généré
+            saveToFirebase(treeData);
         }
     </script>
 </body>
 </html>
-
-
-
 
 
 
