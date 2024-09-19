@@ -3,128 +3,545 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FancyTree avec Firebase et Importation XLS</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/skin-lion/ui.fancytree.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/jquery.fancytree@2.37.0/dist/jquery.fancytree-all-deps.min.js"></script>
-
-    <!-- Firebase -->
+    <title>Importation XLS et FancyTree avec 14 colonnes et Drag and Drop</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.0/skin-lion/ui.fancytree.min.css">
+    <style>
+        body {
+            display: flex;
+        }
+        .left-pane {
+            width: 50%;
+            padding: 10px;
+            height: 100vh; /* Hauteur de la fenêtre */
+            overflow-y: auto; /* Défilement vertical indépendant */
+        }
+        .right-pane {
+            width: 50%;
+            padding: 10px;
+            height: 100vh; /* Hauteur de la fenêtre */
+            overflow-y: auto; /* Défilement vertical indépendant */
+        }
+        #tree {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        .draggable {
+            cursor: move;
+        }
+        .highlight {
+            background-color: green !important;
+        }
+        .counter-green {
+            background-color: green !important;
+        }
+    </style>
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js"></script>
-
-    <style>
-        .table { width: 100%; border-collapse: collapse; }
-        .table th, .table td { border: 1px solid #ddd; padding: 8px; }
-    </style>
 </head>
 <body>
-    <h2>FancyTree avec Importation XLS et Firebase</h2>
+
+<div class="left-pane">
+    <h2>Importation Excel dans FancyTree</h2>
     <input type="file" id="importExcel" accept=".xlsx">
-    <table id="fancytreeTable" class="table">
+    <table id="tree" class="table">
+        <colgroup>
+            <col width="30px">
+            <col width="200px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <col width="100px">
+            <!-- Nouvelle colonne pour le compteur -->
+            <col width="50px"> 
+        </colgroup>
         <thead>
             <tr>
-                <th>Key</th>
-                <th>Title</th>
+                <th>#</th>
+                <th>Titre</th>
                 <th>Colonne 1</th>
                 <th>Colonne 2</th>
+                <th>Colonne 6</th>
+                <th>Colonne 8</th>
+                <th>Colonne 9</th>
+                <th>Colonne 11</th>
+                <th>Colonne 12</th>
+                <th>Colonne 13</th>
+                <th>Colonne 14</th>
+                <th>Colonne 15</th>
+                <th>Colonne 16</th>
+                <th>Colonne 17</th>
+                <th>Compteur</th> <!-- Ajout de la colonne "Compteur" -->
             </tr>
         </thead>
-        <tbody>
-        </tbody>
+        <tbody></tbody>
     </table>
+</div>
 
-    <script>
-        // Configuration Firebase avec des valeurs correctes
-        const firebaseConfig = {
-             apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
+<div class="right-pane">
+    <h2>Fenêtre Droite avec Gestion Plan DOCX</h2>
+    <input type="file" id="importWord" accept=".docx"><br><br>
+    <button id="exportJsonBtn" class="btn">Exporter en JSON</button>
+    <button id="importJsonBtn" class="btn">Importer JSON</button>
+    <button id="addNodeBtn" class="btn">Ajouter Sous-répertoire</button>
+    <button id="deleteNodeBtn" class="btn" style="background-color: red;">Supprimer répertoire</button>
+    <button id="exportHtmlBtn" class="btn">Exporter en HTML</button>
+    <div id="tree-right" class="fancytree-container"></div>
+</div>
 
-  authDomain: "pacautov2.firebaseapp.com",
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.0/jquery.fancytree-all-deps.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 
-  databaseURL: "https://pacautov2-default-rtdb.europe-west1.firebasedatabase.app",
+<script>
+    // Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
+        authDomain: "pacautov2.firebaseapp.com",
+        databaseURL: "https://pacautov2-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "pacautov2",
+        storageBucket: "pacautov2.appspot.com",
+        messagingSenderId: "307082937084",
+        appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
+    };
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  projectId: "pacautov2",
+    let counters = {};  // Objet pour stocker les compteurs de chaque élément
 
-  storageBucket: "pacautov2.appspot.com",
-
-  messagingSenderId: "307082937084",
-
-  appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
-
-        };
-
-        // Initialisation de Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
-        // Fonction pour sauvegarder les données dans Firebase après l'importation FancyTree
-        function saveToFirebase(treeData) {
-            treeData.forEach(node => {
-                const nodeId = node.key;
-                firebase.database().ref('tree/' + nodeId).set(node)
-                    .then(() => console.log(`Données sauvegardées pour le nœud ${nodeId}`))
-                    .catch(err => console.error(`Erreur de sauvegarde : ${err}`));
-            });
+    // Fonction pour mettre à jour le compteur affiché
+    function updateCounterDisplay(rowElement, counter) {
+        const counterCell = rowElement.querySelector('td:last-child');
+        counterCell.textContent = counter;
+        if (counter > 0) {
+            counterCell.classList.add('counter-green');
+        } else {
+            counterCell.classList.remove('counter-green');
         }
+    }
 
-        // Gestion de l'importation du fichier Excel
-        document.getElementById('importExcel').addEventListener('change', function(event) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-                generateFancyTreeFromExcel(sheet); // Charger d'abord dans FancyTree
+    // Fonction pour gérer le clic sur la cellule du compteur
+    function toggleElementHighlight(row) {
+        const title = row.querySelector('td:nth-child(2)').textContent;
+        const element = document.querySelector(`.right-pane [data-title='${title}']`);
+        if (element) {
+            if (element.classList.contains('highlight')) {
+                element.classList.remove('highlight');
+            } else {
+                element.classList.add('highlight');
+            }
+        }
+    }
+
+    // Sauvegarde des données dans Firebase
+    function saveDataToFirebase(treeData, path) {
+        firebase.database().ref(path).set(treeData, function(error) {
+            if (error) {
+                console.error('Erreur lors de la sauvegarde dans Firebase:', error);
+            } else {
+                console.log('Données sauvegardées dans Firebase avec succès');
+            }
+        });
+    }
+
+    // Chargement des données depuis Firebase
+    function loadDataFromFirebase(path, callback) {
+        firebase.database().ref(path).once('value', function(snapshot) {
+            const data = snapshot.val();
+            if (data) {
+                callback(data);
+            } else {
+                console.log('Aucune donnée trouvée dans Firebase');
+            }
+        });
+    }
+
+    // Fonction pour incrémenter le compteur d'un élément donné
+    function incrementCounterForTitle(title) {
+        const rows = document.querySelectorAll("#tree tbody tr");
+        rows.forEach(function(row) {
+            const rowTitle = row.querySelector('td:nth-child(2)').textContent;
+            if (rowTitle === title) {
+                let counter = parseInt(row.querySelector('td:last-child').textContent) || 0;
+                counter++;
+                counters[title] = counter;
+                updateCounterDisplay(row, counter);
+            }
+        });
+    }
+
+    // Fonction pour décrémenter le compteur d'un élément donné
+    function decrementCounterForTitle(title) {
+        const rows = document.querySelectorAll("#tree tbody tr");
+        rows.forEach(function(row) {
+            const rowTitle = row.querySelector('td:nth-child(2)').textContent;
+            if (rowTitle === title) {
+                let counter = parseInt(row.querySelector('td:last-child').textContent) || 0;
+                if (counter > 0) {
+                    counter--;
+                }
+                counters[title] = counter;
+                updateCounterDisplay(row, counter);
+            }
+        });
+    }
+
+    // Fonction pour traiter les données Excel et créer les nœuds FancyTree
+    function importExcelData(data) {
+        var treeData = [];
+        data.forEach(function(row, index) {
+            if (index === 0) return;  // Ignorer la première ligne (entête)
+
+            var node = {
+                key: index,
+                title: row[2] || "Titre manquant",  // Colonne 3
+                tooltip: row[6] || "",  // Colonne 7 pour infobulle
+                data: {
+                    column1: row[0] || "N/A",  // Colonne 1
+                    column2: row[1] || "N/A",  // Colonne 2
+                    column6: row[5] || "N/A",  // Colonne 6
+                    column8: row[7] || "N/A",  // Colonne 8
+                    column9: row[8] || "N/A",  // Colonne 9
+                    column11: row[10] || "N/A",  // Colonne 11
+                    column12: row[11] || "N/A",  // Colonne 12
+                    column13: row[12] || "N/A",  // Colonne 13
+                    column14: row[13] || "N/A",  // Colonne 14
+                    column15: row[14] || "N/A",  // Colonne 15
+                    column16: row[15] || "N/A",  // Colonne 16
+                    column17: row[16] || "N/A",  // Colonne 17
+                    column18: row[17] || "N/A"   // Colonne 18
+                }
             };
-            reader.readAsArrayBuffer(event.target.files[0]);
+            treeData.push(node);
         });
 
-        // Fonction pour générer FancyTree à partir des données Excel
-        function generateFancyTreeFromExcel(data) {
-            let treeData = [];
+        $("#tree").fancytree("getTree").reload(treeData);
 
-            data.forEach((row, index) => {
-                if (index === 0) return; // Ignorer l'en-tête
+        // Sauvegarder les données dans Firebase après l'importation d'Excel
+        saveDataToFirebase(treeData, 'fancytree/leftPane');
 
-                let newNode = {
-                    key: index,  // Clé unique basée sur l'index
-                    title: row[1] || "Titre manquant",  // Colonne 2 du fichier Excel
-                    folder: false,
-                    data: {
-                        column1: row[0] || "N/A",  // Colonne 1
-                        column3: row[2] || "N/A"   // Colonne 3
-                    }
-                };
-                treeData.push(newNode);
+        // Ajout des fonctionnalités de drag and drop pour chaque ligne
+        $("tr").addClass("draggable").attr("draggable", "true").on("dragstart", function(e) {
+            var rowTitle = $(this).find("td:nth-child(2)").text();
+            var rowTooltip = $(this).find("td:nth-child(2)").attr("title");
+            e.originalEvent.dataTransfer.setData("text/plain", rowTitle);
+            e.originalEvent.dataTransfer.setData("text/tooltip", rowTooltip);
+        });
+    }
+
+    // Lecture du fichier Excel
+    document.getElementById('importExcel').addEventListener('change', function(event) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+            var sheetName = workbook.SheetNames[0];
+            var sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+            importExcelData(sheet);
+        };
+        reader.readAsArrayBuffer(event.target.files[0]);
+    });
+
+    // Fonction pour charger et afficher les données de FancyTree depuis Firebase au démarrage
+    window.addEventListener('load', function() {
+        loadDataFromFirebase('fancytree/leftPane', function(data) {
+            $("#tree").fancytree("getTree").reload(data);
+        });
+
+        loadDataFromFirebase('fancytree/rightPane', function(data) {
+            $("#tree-right").fancytree("getTree").reload(data);
+        });
+    });
+
+    // Configuration de FancyTree pour la fenêtre de gauche
+    $("#tree").fancytree({
+        extensions: ["table"],
+        checkbox: false,
+        source: [],
+        table: {
+            indentation: 20,
+            nodeColumnIdx: 1 // Colonne pour le titre du nœud
+        },
+        renderColumns: function(event, data) {
+            var node = data.node;
+            var $tdList = $(node.tr).find(">td");
+
+            // Affichage des colonnes avec les données extraites
+            $tdList.eq(0).text(node.key);  // Clé du nœud
+            $tdList.eq(1).text(node.title);  // Titre du nœud (colonne 3)
+            $tdList.eq(1).attr("title", node.tooltip);  // Ajouter tooltip à la colonne 3
+            $tdList.eq(2).text(node.data.column1);  // Colonne 1
+            $tdList.eq(3).text(node.data.column2);  // Colonne 2
+            $tdList.eq(4).text(node.data.column6);  // Colonne 6
+            $tdList.eq(5).text(node.data.column8);  // Colonne 8
+            $tdList.eq(6).text(node.data.column9);  // Colonne 9
+            $tdList.eq(7).text(node.data.column11);  // Colonne 11
+            $tdList.eq(8).text(node.data.column12);  // Colonne 12
+            $tdList.eq(9).text(node.data.column13);  // Colonne 13
+            $tdList.eq(10).text(node.data.column14);  // Colonne 14
+            $tdList.eq(11).text(node.data.column15);  // Colonne 15
+            $tdList.eq(12).text(node.data.column16);  // Colonne 16
+            $tdList.eq(13).text(node.data.column17);  // Colonne 17
+            $tdList.eq(14).text(counters[node.title] || 0);  // Compteur
+
+            // Ajout de l'événement clic sur la cellule du compteur
+            $tdList.eq(14).on('click', function() {
+                toggleElementHighlight(node.tr);
             });
-
-            // Création de FancyTree avec les données importées
-            $("#fancytreeTable").fancytree({
-                extensions: ["table"],
-                table: {
-                    checkboxColumnIdx: 0,  // Ajouter des cases à cocher dans cette colonne
-                    indentation: 20,       // Indentation pour la structure de l'arbre
-                    nodeColumnIdx: 1       // Placer l'expandeur et le titre du nœud dans cette colonne
-                },
-                source: treeData,
-                renderColumns: function(event, data) {
-                    var node = data.node,
-                        $tdList = $(node.tr).find(">td");
-
-                    $tdList.eq(0).text(node.key);  // Afficher la clé du nœud
-                    $tdList.eq(1).text(node.title);  // Afficher le titre du nœud
-                    $tdList.eq(2).text(node.data.column1);  // Afficher les données personnalisées pour la colonne 1
-                    $tdList.eq(3).text(node.data.column3);  // Afficher les données personnalisées pour la colonne 3
-                }
-            });
-
-            // Sauvegarder les données dans Firebase après que FancyTree est généré
-            saveToFirebase(treeData);
         }
-    </script>
+    });
+
+    // Configuration de FancyTree pour la fenêtre de droite
+    $("#tree-right").fancytree({
+        extensions: ["dnd5"],
+        source: [],
+        dnd5: {
+            preventRecursion: true,
+            preventVoidMoves: true,
+            dragStart: function(node, data) {
+                return true;
+            },
+            dragEnter: function(node, data) {
+                if (!data.otherNode) {
+                    return node.folder ? ["over"] : false;
+                }
+                if (data.otherNode.folder) {
+                    return node.folder ? ["before", "after", "over"] : false;
+                } else {
+                    return node.folder ? ["over"] : ["before", "after"];
+                }
+            },
+            dragDrop: function(node, data) {
+                var title, tooltip;
+
+                if (data.otherNode) {
+                    // Si un élément est déplacé ou copié depuis le plan
+                    title = data.otherNode.title;
+                    tooltip = data.otherNode.tooltip;
+
+                    var newNode = {
+                        title: title,
+                        tooltip: tooltip,
+                        folder: false,
+                        allowChildren: false
+                    };
+
+                    if (!data.otherNode.folder && node.folder) {
+                        var children = node.getChildren();
+                        if (children && children.length > 0) {
+                            var firstFolderChild = children.find(child => child.folder);
+                            if (firstFolderChild) {
+                                // Déplacer ou copier avant le premier répertoire
+                                data.otherNode.moveTo(firstFolderChild, "before");
+                            } else {
+                                // Si aucun sous-répertoire n'est trouvé, ajouter comme enfant normal
+                                data.otherNode.moveTo(node, "child");
+                            }
+                        } else {
+                            data.otherNode.moveTo(node, "child");
+                        }
+                    } else {
+                        data.otherNode.moveTo(node, data.hitMode);
+                    }
+
+                } else {
+                    // Si un élément est déposé depuis l'extérieur (comme depuis la partie gauche)
+                    title = data.dataTransfer.getData("text/plain");
+                    tooltip = data.dataTransfer.getData("text/tooltip");
+
+                    var newNode = {
+                        title: title,
+                        tooltip: tooltip,
+                        folder: false,
+                        allowChildren: false
+                    };
+
+                    if (node.folder) {
+                        var children = node.getChildren();
+                        if (children && children.length > 0) {
+                            var firstFolderChild = children.find(child => child.folder);
+                            if (firstFolderChild) {
+                                // Insérer avant le premier sous-répertoire trouvé
+                                node.addChildren(newNode, firstFolderChild);
+                            } else {
+                                node.addChildren(newNode);
+                            }
+                        } else {
+                            node.addChildren(newNode);
+                        }
+                    } else {
+                        node.addChildren(newNode, data.hitMode);
+                    }
+                    node.setExpanded(true);
+
+                    incrementCounterForTitle(title);
+                }
+
+                // Sauvegarder les modifications dans Firebase après chaque drag and drop
+                const treeLeft = $("#tree").fancytree("getTree").toDict(true);
+                saveDataToFirebase(treeLeft, 'fancytree/leftPane');
+
+                const treeRight = $("#tree-right").fancytree("getTree").toDict(true);
+                saveDataToFirebase(treeRight, 'fancytree/rightPane');
+            }
+        }
+    });
+
+    // Gestion du plan DOCX, JSON, et HTML
+    document.getElementById('importWord').addEventListener('change', function(event) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            mammoth.convertToHtml({ arrayBuffer: e.target.result })
+                .then(result => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(result.value, 'text/html');
+                    buildFancyTreeFromDocx(doc.body);
+                });
+        };
+        reader.readAsArrayBuffer(event.target.files[0]);
+    });
+
+    function buildFancyTreeFromDocx(content) {
+        const treeData = [];
+        const stack = [treeData];
+        content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+            const level = parseInt(heading.tagName[1]);
+            const node = { title: heading.textContent, folder: true, children: [] };
+            while (stack.length > level) stack.pop();
+            stack[stack.length - 1].push(node);
+            stack.push(node.children);
+        });
+        $("#tree-right").fancytree("getTree").reload(treeData);
+
+        // Sauvegarder les données du plan DOCX dans Firebase après l'importation
+        saveDataToFirebase(treeData, 'fancytree/rightPane');
+    }
+
+    document.getElementById('exportJsonBtn').addEventListener('click', function() {
+        const tree = $("#tree-right").fancytree("getTree").toDict(true);
+        const json = JSON.stringify(tree, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        saveAs(blob, "plan.json");
+    });
+
+    document.getElementById('importJsonBtn').addEventListener('click', function() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'application/json';
+        fileInput.addEventListener('change', function(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const json = JSON.parse(e.target.result);
+                $("#tree-right").fancytree("getTree").reload(json);
+
+                // Sauvegarder les données importées dans Firebase
+                saveDataToFirebase(json, 'fancytree/rightPane');
+            };
+            reader.readAsText(event.target.files[0]);
+        });
+        fileInput.click();
+    });
+
+    document.getElementById('exportHtmlBtn').addEventListener('click', function() {
+        const tree = $("#tree-right").fancytree("getTree").toDict(true);
+
+        function traverseTree(node, depth = 1) {
+            let output = '';
+            const title = node.title || '';
+            const tooltip = node.tooltip || '';
+            if (node.folder) {
+                output += `<h${depth}>${title}</h${depth}><p>${tooltip}</p>`;
+            } else {
+                output += `<p><strong>${title}</strong><br>${tooltip}</p>`;
+            }
+            if (node.children) {
+                node.children.forEach(child => {
+                    output += traverseTree(child, depth + 1);
+                });
+            }
+            return output;
+        }
+
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Plan Hiérarchique Exporté</title>
+        </head>
+        <body>
+            ${traverseTree(tree)}
+        </body>
+        </html>`;
+
+        const blob = new Blob([htmlContent], { type: "text/html" });
+        saveAs(blob, "plan_hierarchique.html");
+    });
+
+    // Gestion des boutons "Ajouter Sous-répertoire" et "Supprimer répertoire"
+    document.getElementById('addNodeBtn').addEventListener('click', function() {
+        const tree = $("#tree-right").fancytree("getTree");
+        const activeNode = tree.getActiveNode();
+        if (activeNode) {
+            const nodeName = prompt("Entrez le nom du nouveau sous-répertoire:");
+            if (nodeName) {
+                activeNode.addChildren({ title: nodeName, folder: true });
+                activeNode.setExpanded(true);
+
+                // Sauvegarder les modifications après ajout de répertoire
+                const treeRight = tree.toDict(true);
+                saveDataToFirebase(treeRight, 'fancytree/rightPane');
+            }
+        } else {
+            alert("Veuillez sélectionner un répertoire pour ajouter un sous-répertoire.");
+        }
+    });
+
+    document.getElementById('deleteNodeBtn').addEventListener('click', function() {
+        const tree = $("#tree-right").fancytree("getTree");
+        const activeNode = tree.getActiveNode();
+        if (activeNode && confirm("Êtes-vous sûr de vouloir supprimer ce répertoire et tous ses sous-répertoires?")) {
+            function decrementCountersForDeletedNode(node) {
+                if (!node.folder) {
+                    decrementCounterForTitle(node.title);
+                }
+                const children = node.getChildren();
+                if (children) {
+                    children.forEach(child => decrementCountersForDeletedNode(child));
+                }
+            }
+
+            decrementCountersForDeletedNode(activeNode);
+            activeNode.remove();
+
+            // Sauvegarder les modifications après suppression de répertoire
+            const treeRight = tree.toDict(true);
+            saveDataToFirebase(treeRight, 'fancytree/rightPane');
+        } else {
+            alert("Veuillez sélectionner un répertoire à supprimer.");
+        }
+    });
+</script>
+
 </body>
 </html>
+
 
 
 
