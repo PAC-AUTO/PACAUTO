@@ -108,6 +108,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
 
 <script>
+
+// Importer les fonctions Firebase spécifiques
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.1.0/firebase-app.js';
+import { getDatabase, ref, set, get, child, onValue } from 'https://www.gstatic.com/firebasejs/9.1.0/firebase-database.js';
+
     // Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBFEt617ywvSB1dqoca95idSEMILMNHo3Q",
@@ -118,9 +123,13 @@
         messagingSenderId: "307082937084",
         appId: "1:307082937084:web:06ab27ea5da0ac0e454d79"
     };
+
+
     // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+   const app = initializeApp(firebaseConfig);
+   const db = getDatabase(app);
+
+
 
     let counters = {};  // Objet pour stocker les compteurs de chaque élément
 
@@ -149,15 +158,16 @@
     }
 
     // Sauvegarde des données dans Firebase
-    function saveDataToFirebase(treeData, path) {
-        firebase.database().ref(path).set(treeData, function(error) {
-            if (error) {
-                console.error('Erreur lors de la sauvegarde dans Firebase:', error);
-            } else {
-                console.log('Données sauvegardées dans Firebase avec succès');
-            }
-        });
-    }
+   function saveDataToFirebase(treeData, path) {
+    set(ref(db, path), treeData)
+      .then(() => {
+        console.log('Données sauvegardées dans Firebase avec succès');
+      })
+      .catch((error) => {
+        console.error('Erreur lors de la sauvegarde dans Firebase:', error);
+      });
+}
+
 
     // Chargement des données depuis Firebase
     function loadDataFromFirebase(path, callback) {
@@ -257,16 +267,39 @@
         reader.readAsArrayBuffer(event.target.files[0]);
     });
 
-    // Fonction pour charger et afficher les données de FancyTree depuis Firebase au démarrage
-    window.addEventListener('load', function() {
-        loadDataFromFirebase('fancytree/leftPane', function(data) {
-            $("#tree").fancytree("getTree").reload(data);
-        });
+ function loadDataFromFirebase(path, callback) {
+    const dbRef = ref(db, path);
+    get(dbRef)
+      .then((snapshot) => {
+        if (snapshot.exists()) {
+          callback(snapshot.val());
+        } else {
+          console.log("Aucune donnée trouvée dans Firebase");
+        }
+      })
+      .catch((error) => {
+        console.error("Erreur lors de la lecture des données :", error);
+      });
+}
 
-        loadDataFromFirebase('fancytree/rightPane', function(data) {
-            $("#tree-right").fancytree("getTree").reload(data);
-        });
+// Exemple d'utilisation pour charger des données au démarrage
+window.addEventListener('load', function() {
+    loadDataFromFirebase('fancytree/leftPane', function(data) {
+        $("#tree").fancytree("getTree").reload(data);
     });
+
+    loadDataFromFirebase('fancytree/rightPane', function(data) {
+        $("#tree-right").fancytree("getTree").reload(data);
+    });
+});
+
+
+
+
+
+
+
+
 
     // Configuration de FancyTree pour la fenêtre de gauche
     $("#tree").fancytree({
